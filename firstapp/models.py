@@ -7,8 +7,9 @@ from django.db import models
 
 # 实体部分
 class User(models.Model):
-    User_name = models.CharField(max_length=64,verbose_name="用户名")
+    User_name = models.CharField(max_length=64,verbose_name="用户名",unique=True)
     User_email = models.EmailField(default=None,verbose_name="邮箱")
+    avatar = models.ImageField(upload_to='', blank = True,default=None,verbose_name="头像")
     add_time = models.DateTimeField(auto_now_add=True,verbose_name="添加时间")
     password = models.CharField(max_length=256,verbose_name="密码")
 
@@ -28,10 +29,11 @@ class Team(models.Model):
 class Document(models.Model):
     create_time = models.DateTimeField(auto_now_add=True,verbose_name="创建时间")
     last_time = models.DateTimeField(auto_now=True,verbose_name="最后一次修改时间")
-    content = models.CharField(max_length=10240,verbose_name="文档内容")
+    content = models.TextField(verbose_name="文档内容")
     title = models.CharField(max_length=32,verbose_name="文档标题")
 
-    file = models.ForeignKey('File', on_delete=models.CASCADE, verbose_name="所属文件夹", default=None)
+    file = models.ForeignKey('File', on_delete=models.CASCADE, verbose_name="所属文件夹", default=None,null=True)
+    AuthorityUsers = models.ManyToManyField('User', through='Permission', related_name="Document_AuthorityUsers")
     EditUsers = models.ManyToManyField('User',through='Document_through_EditUser',related_name="Document_EditUsers")
     BrowseUsers = models.ManyToManyField('User',through='Document_through_BrowseUser',related_name="BrowseUsers")
     CollectUsers = models.ManyToManyField('User',through='Document_through_CollectUser',related_name="CollectUsers")
@@ -85,7 +87,12 @@ class Document_through_CollectUser(models.Model):
     Collect_time = models.DateTimeField(auto_now_add=True, verbose_name="收藏时间")
 
 class Permission(models.Model):
+    Team =  models.ForeignKey('Team', on_delete=models.CASCADE, verbose_name="团队", default=None, blank=False)
     Document = models.ForeignKey('Document', on_delete=models.CASCADE, verbose_name="文档", default=None, blank=False)
     User = models.ForeignKey('User', on_delete=models.CASCADE, verbose_name="用户", default=None, blank=False)
     add_time = models.DateTimeField(auto_now_add=True, verbose_name="添加时间")
-    level = models.IntegerField(default=0,verbose_name="权限等级")
+    one = models.BooleanField(default=False)
+    two = models.BooleanField(default=False)
+    three = models.BooleanField(default=False)
+    four = models.BooleanField(default=False)
+    five = models.BooleanField(default=False)

@@ -145,6 +145,8 @@ DEFAULT_FROM_EMAIL = 'Software2020<1205672770@qq.com>'
 
 STATIC_URL = '/static/'
 
+MEDIA_ROOT = os.path.join(BASE_DIR, 'appfront/dist/static/img/')
+
 # Add for vuejs
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "appfront/dist/static"),

@@ -10,4 +10,8 @@ urlpatterns = [
     path('captcha/',views.captcha,name='captcha'),
     path('register/',views.register,name='register'),
     path('login/',views.login,name='login'),
+    path('getauthority/', views.getauthority, name='getauthority'),
+    path('pushauthority/', views.pushauthority, name='pushauthority'),
+    path('PersonIndex/',views.PersonIndex,name='PersonIndex'),
+    path('changeInfo/', views.changeInfo, name='changeInfo'),
 ]
