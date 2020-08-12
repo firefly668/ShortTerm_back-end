@@ -20,25 +20,29 @@ class Message(models.Model):
     User = models.ForeignKey("User",on_delete=models.CASCADE,verbose_name="所有者",default=None)
 
 class Team(models.Model):
-    content = models.CharField(max_length=256,verbose_name="团队描述",default=None)
+    content = models.CharField(max_length=256,verbose_name="团队描述",default=None,null=True)
     team_name =  models.CharField(max_length=64,verbose_name="团队名")
     create_time = models.DateTimeField(auto_now_add=True,verbose_name="创建时间")
 
-    memebers = models.ManyToManyField('User',through = 'User_through_Team')
+    creater = models.ForeignKey("User",on_delete=models.CASCADE,verbose_name="创建者",default=None,related_name="creater")
+    memebers = models.ManyToManyField('User',through = 'User_through_Team',related_name="menebers")
 
 class Document(models.Model):
     create_time = models.DateTimeField(auto_now_add=True,verbose_name="创建时间")
     last_time = models.DateTimeField(auto_now=True,verbose_name="最后一次修改时间")
     content = models.TextField(verbose_name="文档内容")
     title = models.CharField(max_length=32,verbose_name="文档标题")
+    recycle = models.BooleanField(default=False)
+    model = models.BooleanField(default=False)
+    judgeable = models.BooleanField(default=False)
 
     file = models.ForeignKey('File', on_delete=models.CASCADE, verbose_name="所属文件夹", default=None,null=True)
-    AuthorityUsers = models.ManyToManyField('User', through='Permission', related_name="Document_AuthorityUsers")
-    EditUsers = models.ManyToManyField('User',through='Document_through_EditUser',related_name="Document_EditUsers")
-    BrowseUsers = models.ManyToManyField('User',through='Document_through_BrowseUser',related_name="BrowseUsers")
-    CollectUsers = models.ManyToManyField('User',through='Document_through_CollectUser',related_name="CollectUsers")
+    AuthorityUsers = models.ManyToManyField('User', through='Permission', related_name="Document_AuthorityUsers",verbose_name="权限列表")
+    EditUsers = models.ManyToManyField('User',through='Document_through_EditUser',related_name="Document_EditUsers",verbose_name="修改用户记录")
+    BrowseUsers = models.ManyToManyField('User',through='Document_through_BrowseUser',related_name="BrowseUsers",verbose_name="浏览用户记录")
+    CollectUsers = models.ManyToManyField('User',through='Document_through_CollectUser',related_name="CollectUsers",verbose_name="收藏用户列表")
     User = models.ForeignKey('User', on_delete=models.CASCADE, verbose_name="创建者", default=None, blank=False)
-    Team = models.ForeignKey('Team', on_delete=models.CASCADE, verbose_name="团队", default=None)
+    Team = models.ForeignKey('Team', on_delete=models.CASCADE, verbose_name="团队", default=None,null=True)
 
 class File(models.Model):
     File_name = models.CharField(max_length=32,verbose_name="文件夹名字",default=None)
@@ -79,7 +83,7 @@ class File_through_EditUser(models.Model):
 class Document_through_BrowseUser(models.Model):
     Document = models.ForeignKey('Document', on_delete=models.CASCADE, verbose_name="被浏览文档", default=None, blank=False)
     User = models.ForeignKey('User', on_delete=models.CASCADE, verbose_name="浏览者", default=None, blank=False)
-    Edit_time = models.DateTimeField(auto_now_add=True, verbose_name="浏览时间")
+    Browse_time = models.DateTimeField(auto_now_add=True, verbose_name="浏览时间")
 
 class Document_through_CollectUser(models.Model):
     Document = models.ForeignKey('Document', on_delete=models.CASCADE, verbose_name="被收藏文档", default=None, blank=False)

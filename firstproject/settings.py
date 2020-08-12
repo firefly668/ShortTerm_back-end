@@ -88,7 +88,7 @@ WSGI_APPLICATION = 'firstproject.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'myblog',
+        'NAME': 'shortterm',
         'USER': 'noroot',
         'PASSWORD': '123',
         'HOST': '127.0.0.1',
@@ -126,7 +126,7 @@ USE_I18N = True
 
 USE_L10N = True
 
-USE_TZ = True
+USE_TZ = False
 
 
 
@@ -136,7 +136,7 @@ EMAIL_USE_SSL = True
 EMAIL_HOST = 'smtp.qq.com'
 EMAIL_PORT = 465
 EMAIL_HOST_USER = '1205672770@qq.com' # 帐号
-EMAIL_HOST_PASSWORD = 'stgklbynwutegggd'  # 密码
+EMAIL_HOST_PASSWORD = 'yayphmlxqxfofeid'  # 密码
 DEFAULT_FROM_EMAIL = 'Software2020<1205672770@qq.com>'
 
 
