@@ -34,11 +34,22 @@ class Document(models.Model):
     title = models.CharField(max_length=32,verbose_name="文档标题")
     recycle = models.BooleanField(default=False)
     model = models.BooleanField(default=False)
+
+    #分享权限
     judgeable = models.BooleanField(default=False)
+    readable = models.BooleanField(default=False)
+    editable = models.BooleanField(default=False)
+    deleteable = models.BooleanField(default=False)
+
+    #团队权限
+    Rnum = models.IntegerField(default=1)
+    Enum = models.IntegerField(default=3)
+    Cnum = models.IntegerField(default=2)
+    Dnum = models.IntegerField(default=4)
+
 
     file = models.ForeignKey('File', on_delete=models.CASCADE, verbose_name="所属文件夹", default=None,null=True)
-    AuthorityUsers = models.ManyToManyField('User', through='Permission', related_name="Document_AuthorityUsers",verbose_name="权限列表")
-    EditUsers = models.ManyToManyField('User',through='Document_through_EditUser',related_name="Document_EditUsers",verbose_name="修改用户记录")
+    EditUsers = models.ManyToManyField('User',through='Document_through_EditUser',related_name="EditUsers",verbose_name="修改用户记录")
     BrowseUsers = models.ManyToManyField('User',through='Document_through_BrowseUser',related_name="BrowseUsers",verbose_name="浏览用户记录")
     CollectUsers = models.ManyToManyField('User',through='Document_through_CollectUser',related_name="CollectUsers",verbose_name="收藏用户列表")
     User = models.ForeignKey('User', on_delete=models.CASCADE, verbose_name="创建者", default=None, blank=False)
@@ -56,26 +67,27 @@ class File(models.Model):
 class Comment(models.Model):
     content = models.CharField(max_length=256,verbose_name="评价内容",default=None)
 
-    User = models.ForeignKey('User', on_delete=models.CASCADE, verbose_name="评论者", default=None, blank=False)
-    Document = models.ForeignKey('Document', on_delete=models.CASCADE, verbose_name="被评论文档", default=None, blank=False)
+    User = models.ForeignKey('User', on_delete=models.CASCADE, verbose_name="评论者", default=None,null=True)
+    Document = models.ForeignKey('Document', on_delete=models.CASCADE, verbose_name="被评论文档", default=None,null=True)
 
 class Del_Document(models.Model):
     pass
 
 #中间表部分
 class User_through_Team(models.Model):
-    User = models.ForeignKey('User', on_delete=models.CASCADE, verbose_name="团队成员", default=None)
-    Team = models.ForeignKey('Team', on_delete=models.CASCADE, verbose_name="团队", default=None)
+    User = models.ForeignKey('User', on_delete=models.CASCADE, verbose_name="团队成员", related_name="utt_User",default=None)
+    Team = models.ForeignKey('Team', on_delete=models.CASCADE, verbose_name="团队", related_name="utt_Team",default=None)
+    level = models.IntegerField(verbose_name="团队等级",default=1)
+    inviter = models.CharField(max_length=256,verbose_name="邀请者",default=None,null=True)
     join_time = models.DateTimeField(auto_now_add=True, verbose_name="加入时间")
 
 class Document_through_EditUser(models.Model):
     Document = models.ForeignKey('Document', on_delete=models.CASCADE, verbose_name="被修改文档", default=None, blank=False)
     User = models.ForeignKey('User',on_delete=models.CASCADE,verbose_name="修改者",default=None,blank=False)
-    Edit_time = models.DateTimeField(auto_now_add=True, verbose_name="修改时间")
+    Edit_time = models.DateTimeField(auto_now=True, verbose_name="修改时间")
 
 class File_through_EditUser(models.Model):
-    File = models.ForeignKey('File', on_delete=models.CASCADE, verbose_name="被修改文件夹", default=None,
-                                    blank=False)
+    File = models.ForeignKey('File', on_delete=models.CASCADE, verbose_name="被修改文件夹", default=None,blank=False)
     User = models.ForeignKey('User', on_delete=models.CASCADE, verbose_name="修改者", default=None, blank=False)
     Edit_time = models.DateTimeField(auto_now_add=True, verbose_name="修改时间")
 
@@ -83,20 +95,14 @@ class File_through_EditUser(models.Model):
 class Document_through_BrowseUser(models.Model):
     Document = models.ForeignKey('Document', on_delete=models.CASCADE, verbose_name="被浏览文档", default=None, blank=False)
     User = models.ForeignKey('User', on_delete=models.CASCADE, verbose_name="浏览者", default=None, blank=False)
-    Browse_time = models.DateTimeField(auto_now_add=True, verbose_name="浏览时间")
+    Browse_time = models.DateTimeField(auto_now=True, verbose_name="浏览时间")
 
 class Document_through_CollectUser(models.Model):
     Document = models.ForeignKey('Document', on_delete=models.CASCADE, verbose_name="被收藏文档", default=None, blank=False)
     User = models.ForeignKey('User', on_delete=models.CASCADE, verbose_name="收藏者", default=None, blank=False)
     Collect_time = models.DateTimeField(auto_now_add=True, verbose_name="收藏时间")
 
-class Permission(models.Model):
-    Team =  models.ForeignKey('Team', on_delete=models.CASCADE, verbose_name="团队", default=None, blank=False)
-    Document = models.ForeignKey('Document', on_delete=models.CASCADE, verbose_name="文档", default=None, blank=False)
-    User = models.ForeignKey('User', on_delete=models.CASCADE, verbose_name="用户", default=None, blank=False)
-    add_time = models.DateTimeField(auto_now_add=True, verbose_name="添加时间")
-    one = models.BooleanField(default=False)
-    two = models.BooleanField(default=False)
-    three = models.BooleanField(default=False)
-    four = models.BooleanField(default=False)
-    five = models.BooleanField(default=False)
+class Inviter_through_Team(models.Model):
+    User = models.ForeignKey('User', on_delete=models.CASCADE, verbose_name="团队成员", related_name="itt_User",default=None)
+    Team = models.ForeignKey('Team', on_delete=models.CASCADE, verbose_name="团队", related_name="itt_Team",default=None)
+    inviter_time = models.DateTimeField(auto_now=True,verbose_name="邀请时间")
