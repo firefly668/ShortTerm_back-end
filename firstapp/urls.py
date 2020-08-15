@@ -34,5 +34,14 @@ urlpatterns = [
     path('deleteFile/', views.deleteFile, name='deleteFile'),
     path('collectFile/', views.collectFile, name='collectFile'),
     path('getUserAuthority/', views.getUserAuthority, name='getUserAuthority'),
+    path('unCollectFile/', views.unCollectFile, name='unCollectFile'),
+    path('CommentList/', views.CommentList, name='CommentList'),
+    path('DeleteComment/', views.DeleteComment, name='DeleteComment'),
+    path('NewComment/', views.NewComment, name='NewComment'),
+    path('ReplyComment/', views.ReplyComment, name='ReplyComment'),
+    path('myMessage/', views.myMessage, name='myMessage'),
+    path('readMessage/', views.readMessage, name='readMessage'),
+    path('replyInvitation/', views.replyInvitation, name='replyInvitation'),
+    path('TeamInfo/', views.TeamInfo, name='TeamInfo'),
 
 ]

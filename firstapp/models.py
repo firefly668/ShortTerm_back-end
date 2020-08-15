@@ -14,10 +14,17 @@ class User(models.Model):
     password = models.CharField(max_length=256,verbose_name="密码")
 
 class Message(models.Model):
+    TYPES = (
+        ('Invitation','邀请'),
+        ('Normal','普通')
+    )
     send_time = models.DateTimeField(auto_now_add=True,verbose_name="发送时间")
     content = models.CharField(max_length=64,verbose_name="文本内容",default=None)
+    read = models.BooleanField(default=False)
+    type = models.CharField(max_length=64,verbose_name="消息类型",choices=TYPES,default='Normal')
 
-    User = models.ForeignKey("User",on_delete=models.CASCADE,verbose_name="所有者",default=None)
+    send_User = models.ForeignKey("User",on_delete=models.CASCADE,verbose_name="发送者",related_name="send_user",default=None,null=True)
+    accept_User = models.ForeignKey("User",on_delete=models.CASCADE,verbose_name="接收者",related_name="accept_user",default=None)
 
 class Team(models.Model):
     content = models.CharField(max_length=256,verbose_name="团队描述",default=None,null=True)
@@ -66,7 +73,9 @@ class File(models.Model):
 
 class Comment(models.Model):
     content = models.CharField(max_length=256,verbose_name="评价内容",default=None)
+    comment_time = models.DateTimeField(auto_now_add=True,verbose_name="评论时间")
 
+    maincomment = models.ForeignKey('Comment',on_delete=models.CASCADE,verbose_name="回复评论",null=True,default=None)
     User = models.ForeignKey('User', on_delete=models.CASCADE, verbose_name="评论者", default=None,null=True)
     Document = models.ForeignKey('Document', on_delete=models.CASCADE, verbose_name="被评论文档", default=None,null=True)
 
@@ -105,4 +114,5 @@ class Document_through_CollectUser(models.Model):
 class Inviter_through_Team(models.Model):
     User = models.ForeignKey('User', on_delete=models.CASCADE, verbose_name="团队成员", related_name="itt_User",default=None)
     Team = models.ForeignKey('Team', on_delete=models.CASCADE, verbose_name="团队", related_name="itt_Team",default=None)
+    Message = models.ForeignKey("Message",on_delete=models.CASCADE,verbose_name="对应消息",related_name="itt_Message",default=None)
     inviter_time = models.DateTimeField(auto_now=True,verbose_name="邀请时间")
