@@ -5,6 +5,7 @@ from firstapp.models import Document
 from firstapp.models import Team
 from firstapp.models import Comment
 from firstapp.models import Message
+from firstapp.models import Image
 from firstapp.models import Document_through_CollectUser
 from firstapp.models import Document_through_BrowseUser
 from firstapp.models import Document_through_EditUser
@@ -13,6 +14,7 @@ from firstapp.models import Inviter_through_Team
 from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse
 from django.core import serializers
+from django.conf import settings
 from django.core.mail import send_mail
 import json
 import simplejson
@@ -231,6 +233,10 @@ def PersonIndex(request):
                 user = User.objects.get(pk=user_id)
                 response['Username']=user.User_name
                 response['Email']=user.User_email
+                if user.avatar:
+                    response['imageUrl']="/media/img"+user.avatar.url
+                else:
+                    response['imageUrl']=""
                 return JsonResponse(response)
             except Exception as e:
                 response['error']="user isn't exist."
@@ -654,7 +660,7 @@ def memberList(request):
                         member['Founder']=False
 
                     if user.avatar:
-                        member["AvatarUrl"]=user.avatar.path
+                        member["AvatarUrl"]="/media/img"+user.avatar.url
                     else:
                         member["AvatarUrl"] = ""
 
@@ -1199,6 +1205,96 @@ def TeamInfo(request):
                 dt['TID']=document4.Team_id
                 dt['MID']=document4.pk
                 response['Documents4'].append(dt)
+        else:
+            response['error']="lost data"
+        return JsonResponse(response)
+
+def avatarUrl(request):
+    response={}
+    response['status']=False
+    if request.method=="POST":
+        file = request.FILES.get('file')
+        UID = request.POST.get('UID')
+        if UID :
+            try:
+                UID = int(UID)
+            except Exception as e:
+                response['error']="UID isn't a number"
+                return JsonResponse(response)
+            try:
+                user = User.objects.get(pk=UID)
+            except Exception as e:
+                response['error']="this user isn't exist."
+                return JsonResponse(response)
+            file_name = str(UID)+".jpg"
+            save_path = settings.MEDIA_ROOT  + file_name
+            with open(save_path, 'wb') as f:
+                for content in file.chunks():
+                    f.write(content)
+            user.avatar=file.name
+            user.save()
+            response['avatarUrl']="/media/img"+user.avatar.url
+            response['status']=True
+        else:
+            response['error']="lost data"
+        return JsonResponse(response)
+
+def picSave(request):
+    response={}
+    response['imgUrl']=""
+    if request.method=="POST":
+        img = request.FILES.get('img')
+        imgs = Image.objects.all()
+        if imgs:
+            number = imgs.aggregate(Max('pk'))['pk__max'] + 1
+        else:
+            number = 1
+        file_name ="d"+ str(number)+".jpg"
+        save_path = settings.MEDIA_ROOT + file_name
+        with open(save_path,'wb') as f:
+            for content in img.chunks():
+                f.write(content)
+        Image.objects.create(img=file_name)
+        response['imgUrl']="/media/img/"+file_name
+        return JsonResponse(response)
+
+def authJudger(request):
+    response={}
+    response['Status']=False
+    response['PrivateOwn']=False
+    response['TeamOwn']=False
+    response['CanRead']=False
+    response['CanComment']=False
+    response['CanEdit']=False
+    if request.method=="POST":
+        UID = request.POST.get('UID')
+        AID = request.POST.get('AID')
+        if UID and AID:
+            try:
+                UID = int(UID)
+                AID = int(AID)
+            except Exception as e:
+                response['error']="UID or AID isn't a number"
+                return JsonResponse(response)
+            try:
+                user = User.objects.get(pk=UID)
+            except Exception as e:
+                response['error']="this user isn't exist"
+                return JsonResponse(response)
+            try:
+                document = Document.objects.get(pk=AID)
+            except Exception as e:
+                response['error']="this document isn't exist"
+                return JsonResponse(response)
+            if document.Team:
+                response['TeamOwn']=True
+            else:
+                if document.User==user:
+                    response['PrivateOwn']=True
+                else:
+                    response['CanRead']=document.readable
+                    response['CanComment']=document.judgeable
+                    response['CanEdit']=document.editable
         else:
             response['error']="lost data"
         return JsonResponse(response)

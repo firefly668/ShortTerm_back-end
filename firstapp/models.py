@@ -79,8 +79,8 @@ class Comment(models.Model):
     User = models.ForeignKey('User', on_delete=models.CASCADE, verbose_name="评论者", default=None,null=True)
     Document = models.ForeignKey('Document', on_delete=models.CASCADE, verbose_name="被评论文档", default=None,null=True)
 
-class Del_Document(models.Model):
-    pass
+class Image(models.Model):
+    img = models.ImageField(upload_to='', blank = True,default=None,verbose_name="图片")
 
 #中间表部分
 class User_through_Team(models.Model):
