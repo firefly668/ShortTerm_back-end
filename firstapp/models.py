@@ -39,7 +39,11 @@ class Document(models.Model):
     last_time = models.DateTimeField(auto_now=True,verbose_name="最后一次修改时间")
     content = models.TextField(verbose_name="文档内容")
     title = models.CharField(max_length=32,verbose_name="文档标题")
+
+    #回收站
     recycle = models.BooleanField(default=False)
+
+    #模板
     model = models.BooleanField(default=False)
 
     #分享权限

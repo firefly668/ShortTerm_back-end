@@ -46,5 +46,12 @@ urlpatterns = [
     path('avatarUrl/', views.avatarUrl, name='avatarUrl'),
     path('picSave/', views.picSave, name='picSave'),
     path('authJudger/', views.authJudger, name='authJudger'),
+    path('completeDeleteFile/', views.completeDeleteFile, name='completeDeleteFile'),
+    path('restoreFile/', views.restoreFile, name='restoreFile'),
+    path('quitTeam/', views.quitTeam, name='quitTeam'),
+    path('someInfo1/', views.someInfo1, name='someInfo1'),
+    path('someInfo2/', views.someInfo2, name='someInfo2'),
+    path('changeTeamDescription/', views.changeTeamDescription, name='changeTeamDescription'),
+    path('TeamInfo2/', views.TeamInfo2, name='TeamInfo2'),
 
 ]

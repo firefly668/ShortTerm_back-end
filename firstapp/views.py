@@ -93,7 +93,7 @@ def login(request):
             request.session['user_id']=user[0].pk
             response['UserId']=user[0].pk
             if user[0].avatar:
-                response['AvatarUrl'] = user[0].avatar.path
+                response['AvatarUrl'] = "media/img"+user[0].avatar.url
             else:
                 response['AvatarUrl'] = ""
             response['Username'] = user[0].User_name
@@ -457,6 +457,12 @@ def getArticle(request):
             UID = int(UID)
             try:
                 document = Document.objects.get(pk=AID)
+                if document.recycle:
+                    response['error'] = "you can't open a document which in recycle bin"
+                    response['Status'] = False
+                    response['Content'] = ""
+                    response['Title'] = ""
+                    return JsonResponse(response)
                 try:
                     dtb = Document_through_BrowseUser.objects.get(Document=document,User_id=UID)
                     dtb.Browse_time = datetime.datetime.now()
@@ -496,8 +502,6 @@ def someInfo(request):
         UID = request.POST.get('UID')
         if UID:
             UID = int(UID)
-            response['UID']=UID
-
             teams = User_through_Team.objects.filter(User_id=UID)
             if teams:
                 for team in teams:
@@ -508,7 +512,7 @@ def someInfo(request):
                         t['teamName']=tm.team_name
                         response['myTeam'].append(t)
                     except Exception as e:
-                        pass
+                        response['error']="team database wrong"
                         #print(e)
 
 
@@ -517,7 +521,12 @@ def someInfo(request):
                 for documents1 in documents1_B:
                     try:
                         d = {}
-                        document = Document.objects.get(pk=documents1.Document_id)
+                        document = Document.objects.get(pk=documents1.Document_id,recycle=False)
+                        try:
+                            dtc = Document_through_CollectUser.objects.get(Document=document,User_id=UID)
+                            d['isCollect'] = True
+                        except Exception as e:
+                            d['isCollect'] = False
                         user = User.objects.get(pk=document.User_id)
                         d['lastEditDate']=document.last_time
                         d['documentName']=document.title
@@ -530,7 +539,7 @@ def someInfo(request):
                             d['TID']=""
                         response['Documents1'].append(d)
                     except Exception as e:
-                        pass
+                        response['error']="document database wrong"
                         #print(e)
 
             documents2 = Document_through_EditUser.objects.filter(User_id=UID,Edit_time__gte=(datetime.datetime.now() - datetime.timedelta(3)))
@@ -538,7 +547,12 @@ def someInfo(request):
                 for document in documents2:
                     try:
                         d = {}
-                        dt = Document.objects.get(pk=document.Document_id)
+                        dt = Document.objects.get(pk=document.Document_id,recycle=False)
+                        try:
+                            dtc = Document_through_CollectUser.objects.get(Document=dt,User_id=UID)
+                            d['isCollect'] = True
+                        except Exception as e:
+                            d['isCollect'] = False
                         user = User.objects.get(pk=dt.User_id)
                         d['lastEditDate'] = dt.last_time
                         d['documentName'] = dt.title
@@ -551,7 +565,7 @@ def someInfo(request):
                             d['TID']=""
                         response['Documents2'].append(d)
                     except Exception as e:
-                        pass
+                        response['error'] = "document database wrong"
                         #print(e)
 
             documents3 = Document_through_CollectUser.objects.filter(User_id=UID)
@@ -559,7 +573,7 @@ def someInfo(request):
                 for document in documents3:
                     try:
                         d={}
-                        dt = Document.objects.get(pk=document.Document_id)
+                        dt = Document.objects.get(pk=document.Document_id,recycle=False)
                         user = User.objects.get(pk=dt.User_id)
                         d['lastEditDate'] = dt.last_time
                         d['documentName'] = dt.title
@@ -572,14 +586,14 @@ def someInfo(request):
                             d['TID']=""
                         response['Documents3'].append(d)
                     except Exception as e:
-                        pass
+                        response['error']="document database wrong"
                         #print(e)
 
-            documents4 = Document.objects.filter(User_id=UID,model=True)
+            documents4 = Document.objects.filter(User_id=UID,model=True,recycle=False)
             if documents4:
                 for document in documents4:
                     if document.Team:
-                        pass
+                        continue
                     else:
                         d={}
                         d['documentName']=document.title
@@ -682,10 +696,11 @@ def kickMember(request):
             TID = int(TID)
             UID = int(UID)
             try:
+                user = User.objects.get(pk=UID)
                 team = Team.objects.get(pk=TID)
             except Exception as e:
                 #print(e)
-                response['error']="TID wrong"
+                response['error']="TID or UID wrong"
                 return JsonResponse(response)
             try:
                 utt = User_through_Team.objects.get(Team_id=TID,User_id=UID)
@@ -693,7 +708,12 @@ def kickMember(request):
                 #print(e)
                 response['error']="this user didn't in this team"
                 return JsonResponse(response)
+
             utt.delete()
+            utts = User_through_Team.objects.filter(Team_id=TID)
+            content = user.User_name + "已被踢出了" + team.team_name
+            for mutt in utts:
+                Message.objects.create(content=content, type="Normal", accept_User_id=mutt.User_id)
             content = "您已被踢出团队：" + team.team_name
             Message.objects.create(content=content,accept_User_id=UID)
             response['Status']=True
@@ -806,19 +826,22 @@ def deleteFile(request):
                     response['error']="this user don't in this team"
                     return JsonResponse(response)
                 if user_level >= document.Dnum:
-                    document.delete()
+                    document.recycle=True
+                    document.save()
                     response['status']=True
                 else:
                     response['error']="low level"
             else:
                 if document.User_id==UID:
-                    document.delete()
+                    document.recycle=True
+                    document.save()
                     response['status']=True
                 elif document.deleteable:
-                    document.delete()
+                    document.recycle=True
+                    document.save()
                     response['status'] = True
                 else:
-                    response['error']="this document isn't this user's"
+                    response['error']="this document isn't this user's or low level"
         else:
             response['error']="lost data"
         return JsonResponse(response)
@@ -833,15 +856,21 @@ def collectFile(request):
             try:
                 AID = int(AID)
                 UID = int(UID)
-                try:
-                    dtc = Document_through_CollectUser.objects.get(User_id=UID,Document_id=AID)
-                    response['error']="this user already collected this document"
-                except Exception as e:
-                    Document_through_CollectUser.objects.create(User_id=UID,Document_id=AID)
-                    response['status']=True
             except Exception as e:
                 #print(e)
                 response['error']="AID or UID isn't a number"
+                return JsonResponse(response)
+            try:
+                document = Document.objects.get(pk=AID,recycle=False)
+            except Exception as e:
+                response['error']="this document isn't exist or in recyclebin"
+                return JsonResponse(response)
+            try:
+                dtc = Document_through_CollectUser.objects.get(User_id=UID, Document_id=AID)
+                response['error'] = "this user already collected this document"
+            except Exception as e:
+                Document_through_CollectUser.objects.create(User_id=UID, Document_id=AID)
+                response['status'] = True
         else:
             response['error']="lost data"
         return JsonResponse(response)
@@ -953,6 +982,10 @@ def CommentList(request):
                     ct['name']=user.User_name
                     ct['time']=comment.comment_time
                     ct['uid']=user.pk
+                    if user.avatar:
+                        ct['imageurl']="media/img"+user.avatar.url
+                    else:
+                        ct['imageurl'] =""
                     ct['reply']=[]
                     replycomments = Comment.objects.filter(maincomment=comment.pk)
                     for replycomment in replycomments:
@@ -970,6 +1003,10 @@ def CommentList(request):
                         rt['time']=replycomment.comment_time
                         rt['to']=user.User_name
                         rt['uid']=reply_user.pk
+                        if reply_user.avatar:
+                            rt['imageurl']="media/img"+reply_user.avatar.url
+                        else:
+                            rt['imageurl'] =""
                         ct['reply'].append(rt)
                     response['comments'].append(ct)
             response['feedback']=True
@@ -1188,7 +1225,7 @@ def TeamInfo(request):
             except Exception as e:
                 response['error']="database_utt wrong"
                 return JsonResponse(response)
-            documents1 = Document.objects.filter(Team_id=TID,model=False)
+            documents1 = Document.objects.filter(Team_id=TID,model=False,recycle=False)
             for document1 in documents1:
                 dt={}
                 dt['lastEditDate']=document1.last_time
@@ -1198,7 +1235,7 @@ def TeamInfo(request):
                 dt['UID']=document1.User_id
                 dt['TID']=document1.Team_id
                 response['Documents1'].append(dt)
-            documents4 = Document.objects.filter(Team_id=TID,model=True)
+            documents4 = Document.objects.filter(Team_id=TID,model=True,recycle=False)
             for document4 in documents4:
                 dt={}
                 dt['documentName']=document4.title
@@ -1231,9 +1268,9 @@ def avatarUrl(request):
             with open(save_path, 'wb') as f:
                 for content in file.chunks():
                     f.write(content)
-            user.avatar=file.name
+            user.avatar=file_name
             user.save()
-            response['avatarUrl']="/media/img"+user.avatar.url
+            response['avatarUrl']="/media/img/" + file_name
             response['status']=True
         else:
             response['error']="lost data"
@@ -1298,3 +1335,347 @@ def authJudger(request):
         else:
             response['error']="lost data"
         return JsonResponse(response)
+
+def completeDeleteFile(request):
+    response = {}
+    response['status'] = False
+    if request.method == "POST":
+        UID = request.POST.get('UID')
+        AID = request.POST.get('AID')
+        TID = request.POST.get('TID')
+        if UID and AID:
+            try:
+                UID = int(UID)
+                AID = int(AID)
+            except Exception as e:
+                # print(e)
+                response['error'] = "AID or UID isn't a number"
+                return JsonResponse(response)
+            try:
+                document = Document.objects.get(pk=AID)
+            except Exception as e:
+                # print(e)
+                response['error'] = "this document isn't exist"
+                return JsonResponse(response)
+            try:
+                user = User.objects.get(pk=UID)
+            except Exception as e:
+                # print(e)
+                response['error'] = "this user isn't exist"
+                return JsonResponse(response)
+            if TID:
+                try:
+                    TID = int(TID)
+                except Exception as e:
+                    # print(e)
+                    response['error'] = "TID isn't a number"
+                    return JsonResponse(response)
+                try:
+                    team = Team.objects.get(pk=TID)
+                except Exception as e:
+                    # print(e)
+                    response['error'] = "TID wrong"
+                    return JsonResponse(response)
+                try:
+                    user_level = User_through_Team.objects.get(User_id=UID, Team_id=TID).level
+                except Exception as e:
+                    # print(e)
+                    response['error'] = "this user don't in this team"
+                    return JsonResponse(response)
+                if user_level >= document.Dnum:
+                    document.delete()
+                    response['status'] = True
+                else:
+                    response['error'] = "low level"
+            else:
+                if document.User_id == UID:
+                    document.delete()
+                    response['status'] = True
+                elif document.deleteable:
+                    document.delete()
+                    response['status'] = True
+                else:
+                    response['error'] = "this document isn't this user's or low level"
+        else:
+            response['error'] = "lost data"
+        return JsonResponse(response)
+
+def restoreFile(request):
+    response = {}
+    response['status'] = False
+    if request.method == "POST":
+        UID = request.POST.get('UID')
+        AID = request.POST.get('AID')
+        TID = request.POST.get('TID')
+        if UID and AID:
+            try:
+                UID = int(UID)
+                AID = int(AID)
+            except Exception as e:
+                # print(e)
+                response['error'] = "AID or UID isn't a number"
+                return JsonResponse(response)
+            try:
+                document = Document.objects.get(pk=AID)
+            except Exception as e:
+                # print(e)
+                response['error'] = "this document isn't exist"
+                return JsonResponse(response)
+            try:
+                user = User.objects.get(pk=UID)
+            except Exception as e:
+                # print(e)
+                response['error'] = "this user isn't exist"
+                return JsonResponse(response)
+            if TID:
+                try:
+                    TID = int(TID)
+                except Exception as e:
+                    # print(e)
+                    response['error'] = "TID isn't a number"
+                    return JsonResponse(response)
+                try:
+                    team = Team.objects.get(pk=TID)
+                except Exception as e:
+                    # print(e)
+                    response['error'] = "TID wrong"
+                    return JsonResponse(response)
+                try:
+                    user_level = User_through_Team.objects.get(User_id=UID, Team_id=TID).level
+                except Exception as e:
+                    # print(e)
+                    response['error'] = "this user don't in this team"
+                    return JsonResponse(response)
+                if user_level >= document.Dnum:
+                    document.recycle = False
+                    document.save()
+                    response['status'] = True
+                else:
+                    response['error'] = "low level"
+            else:
+                if document.User_id == UID:
+                    document.recycle = False
+                    document.save()
+                    response['status'] = True
+                elif document.deleteable:
+                    document.recycle = False
+                    document.save()
+                    response['status'] = True
+                else:
+                    response['error'] = "this document isn't this user's or low level"
+        else:
+            response['error'] = "lost data"
+        return JsonResponse(response)
+
+def quitTeam(request):
+    response={}
+    response['Status']=False
+    if request.method=="POST":
+        UID = request.POST.get('UID')
+        TID = request.POST.get('TID')
+        if UID and TID:
+            try:
+                UID = int(UID)
+                TID = int(TID)
+            except Exception as e:
+                response['error']="UID or TID isn't a number"
+                return JsonResponse(response)
+            try:
+                user = User.objects.get(pk=UID)
+                team = Team.objects.get(pk=TID)
+                utt = User_through_Team.objects.get(User_id=UID,Team_id=TID)
+            except Exception as e:
+                response['error']="user or team isn't exist or user isn't in team"
+                return JsonResponse(response)
+            utt.delete()
+            utts = User_through_Team.objects.filter(Team_id=TID)
+            content = user.User_name + "已主动退出了" + team.team_name
+            for mutt in utts:
+                Message.objects.create(content=content,type="Normal",accept_User_id=mutt.User_id)
+            response['Status']=True
+        else:
+            response['error']="lost data"
+        return JsonResponse(response)
+
+def someInfo1(request):
+    response = {}
+    response['myTeam'] = []
+    response['Documents1'] = []
+    response['Documents2'] = []
+    if request.method=="POST":
+        UID = request.POST.get('UID')
+        if UID:
+            UID = int(UID)
+            try:
+                user = User.objects.get(pk=UID)
+            except Exception as e:
+                response['error']="this user isn't exist"
+                return JsonResponse(response)
+
+            teams = User_through_Team.objects.filter(User_id=UID)
+            for team in teams:
+                try:
+                    t = {}
+                    tm = Team.objects.get(pk=team.Team_id)
+                    t['TID']=tm.pk
+                    t['teamName']=tm.team_name
+                    response['myTeam'].append(t)
+                except Exception as e:
+                    response['error']="team database wrong"
+
+            documents = Document.objects.filter(User_id=UID,recycle=False)
+            for document in documents:
+                if document.Team:
+                    continue
+                else:
+                    if document.model:
+                        d = {}
+                        d['documentName'] = document.title
+                        d['UID'] = document.User_id
+                        d['MID'] = document.pk
+                        response['Documents2'].append(d)
+                    else:
+                        d = {}
+                        try:
+                            dtc = Document_through_CollectUser.objects.get(Document=document,User_id=UID)
+                            d['isCollect'] = True
+                        except Exception as e:
+                            d['isCollect'] = False
+                        d['documentName'] = document.title
+                        d['lastEditDate'] = document.last_time
+                        d['AID'] = document.pk
+                        d['TID'] = ""
+                        d['documentOwner']=user.User_name
+                        response['Documents1'].append(d)
+            return JsonResponse(response)
+
+def someInfo2(request):
+    response = {}
+    response['myTeam'] = []
+    response['Documents1'] = []
+    if request.method=="POST":
+        UID = request.POST.get('UID')
+        if UID:
+            UID = int(UID)
+            try:
+                user = User.objects.get(pk=UID)
+            except Exception as e:
+                response['error']="this user isn't exist"
+                return JsonResponse(response)
+
+            teams = User_through_Team.objects.filter(User_id=UID)
+            for team in teams:
+                try:
+                    t = {}
+                    tm = Team.objects.get(pk=team.Team_id)
+                    t['TID'] = tm.pk
+                    t['teamName'] = tm.team_name
+                    response['myTeam'].append(t)
+                except Exception as e:
+                    response['error'] = "team database wrong"
+
+            documents = Document.objects.filter(User_id = UID,recycle=True)
+            for document in documents:
+                if document.Team:
+                    continue
+                else:
+                    d = {}
+                    d['documentName'] = document.title
+                    d['lastEditDate'] = document.last_time
+                    d['AID'] = document.pk
+                    d['TID'] = ""
+                    d['documentOwner'] = user.User_name
+                    response['Documents1'].append(d)
+            return JsonResponse(response)
+
+def changeTeamDescription(request):
+    response={}
+    response['Status']=False
+    if request.method=="POST":
+        TID = request.POST.get('TID')
+        UID = request.POST.get('UID')
+        Words = request.POST.get('Words')
+        if TID and UID:
+            try:
+                UID = int(UID)
+                TID = int(TID)
+            except Exception as e:
+                response['error'] = "UID or TID isn't a number"
+                return JsonResponse(response)
+            try:
+                user = User.objects.get(pk=UID)
+                team = Team.objects.get(pk=TID)
+                utt = User_through_Team.objects.get(User_id=UID, Team_id=TID)
+            except Exception as e:
+                response['error'] = "user or team isn't exist or user isn't in team"
+                return JsonResponse(response)
+            team.content=Words
+            team.save()
+            utts = User_through_Team.objects.filter(Team_id=TID)
+            content = user.User_name + "将" + team.team_name + "的团队描述修改为" + Words
+            for mutt in utts:
+                Message.objects.create(content=content, type="Normal", accept_User_id=mutt.User_id)
+            response['Status'] = True
+        else:
+            response['error']="lost data"
+        return JsonResponse(response)
+
+def TeamInfo2(request):
+    response = {}
+    response['team'] = {}
+    response['mylevel'] = 0
+    response['Documents1'] = []
+    response['Documents4'] = []
+    if request.method == "POST":
+        UID = request.POST.get('UID')
+        TID = request.POST.get('TID')
+        if UID and TID:
+            try:
+                UID = int(UID)
+                TID = int(TID)
+            except Exception as e:
+                response['error'] = "UID or TID isn't number"
+                return JsonResponse(response)
+            try:
+                user = User.objects.get(pk=UID)
+            except Exception as e:
+                response['error'] = "this user isn't exist"
+                return JsonResponse(response)
+            try:
+                team = Team.objects.get(pk=TID)
+                response['team']['TID'] = team.pk
+                response['team']['name'] = team.team_name
+                response['team']['describe'] = team.content
+            except Exception as e:
+                response['error'] = "this user isn't exist"
+                return JsonResponse(response)
+            try:
+                utt = User_through_Team.objects.get(User_id=UID, Team_id=TID)
+                response['mylevel'] = utt.level
+            except Exception as e:
+                response['error'] = "database_utt wrong"
+                return JsonResponse(response)
+            documents1 = Document.objects.filter(Team_id=TID,recycle=True)
+            for document1 in documents1:
+                dt = {}
+                dt['lastEditDate'] = document1.last_time
+                dt['documentName'] = document1.title
+                dt['documentOwner'] = document1.User.User_name
+                dt['AID'] = document1.pk
+                dt['UID'] = document1.User_id
+                dt['TID'] = document1.Team_id
+                response['Documents1'].append(dt)
+
+            documents4 = Document.objects.filter(Team_id=TID, model=True)
+            for document4 in documents4:
+                dt = {}
+                dt['documentName'] = document4.title
+                dt['TID'] = document4.Team_id
+                dt['MID'] = document4.pk
+                response['Documents4'].append(dt)
+        else:
+            response['error'] = "lost data"
+        return JsonResponse(response)
+
+
+
