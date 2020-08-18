@@ -6,6 +6,7 @@ from firstapp.models import Team
 from firstapp.models import Comment
 from firstapp.models import Message
 from firstapp.models import Image
+from firstapp.models import Tag
 from firstapp.models import Document_through_CollectUser
 from firstapp.models import Document_through_BrowseUser
 from firstapp.models import Document_through_EditUser
@@ -347,12 +348,15 @@ def checkTeam(request):
 
 def sendMyArticle(request):
     response={}
+    response['Status']=False
     if request.method=="POST":
-        UID = request.POST.get('UID')
-        AID = request.POST.get('AID')
-        TID = request.POST.get('TID')
-        Content = request.POST.get('Content')
-        Title = request.POST.get('Title')
+        data = json.loads(request.body,strict=False)
+        UID = data.get('UID',None)
+        AID = data.get('AID',None)
+        TID = data.get('TID',None)
+        Content = data.get('Content',None)
+        Title = data.get('Title',None)
+        Tags = data.get('Tags',None)
         if UID and AID and Content and Title:
             UID = int(UID)
             AID = int(AID)
@@ -365,55 +369,61 @@ def sendMyArticle(request):
                     if TID:
                         document.Team_id = int(TID)
                     document.save()
+                    Tag.objects.filter(document=document).delete()
+                    for tag in Tags:
+                        Tag.objects.create(name=tag['name'],type=tag['type'],document=document)
                     response['AID']=document.pk
                     Document_through_EditUser.objects.create(Document=document, User_id=UID)
                     Document_through_BrowseUser.objects.create(Document=document,User_id=UID)
+                    document.browse_num+=1
+                    document.edit_num+=1
+                    document.save()
                 except Exception as e:
                     response['Status'] = False
-                    response['UID'] = UID
-                    response['AID'] = AID
-                    response['TID'] = TID
-                    response['Content'] = Content
-                    response['Title'] = Title
                     return JsonResponse(response)
             else:
                 try:
                     document = Document.objects.get(pk=AID)
-                    document.title = Title
-                    document.content = Content
-                    if TID:
-                        document.Team_id = int(TID)
-                    document.save()
-                    try:
-                        dte = Document_through_EditUser.objects.get(Document=document,User_id=UID)
-                        dte.Edit_time = datetime.datetime.now()
-                    except Exception as e:
-                        #print(e)
-                        Document_through_EditUser.objects.create(Document=document, User_id=UID)
-                        response['warning']="last edition didn't record,but this time is done."
                 except Exception as e:
-                    response['Status'] = False
                     response['error'] = "AID wrong"
                     return JsonResponse(response)
+                lastbrowse_time = Document_through_BrowseUser.objects.get(User_id=UID,document=document).Browse_time
+                lastbrowse_time_str = datetime.datetime.strptime(lastbrowse_time,"%Y-%m-%d")
+                lastedit_time_str = datetime.datetime.strptime(document.last_time,"%Y-%m-%d")
+                if lastbrowse_time_str<lastedit_time_str:
+                    return JsonResponse(response)
+                document.title = Title
+                document.content = Content
+                if TID:
+                    document.Team_id = int(TID)
+                document.edit_num+=1
+                document.save()
+                Tag.objects.filter(document=document).delete()
+                for tag in Tags:
+                    Tag.objects.create(name=tag['name'], type=tag['type'], document=document)
+                try:
+                    dte = Document_through_EditUser.objects.get(Document=document,User_id=UID)
+                    dte.Edit_time = datetime.datetime.now()
+                except Exception as e:
+                    Document_through_EditUser.objects.create(Document=document, User_id=UID)
+                    response['warning']="last edition didn't record,but this time is done."
             response['Status'] = True
             return JsonResponse(response)
         else:
-            response['Status']=False
             response['error']="lost data"
-            response['UID']=UID
-            response['AID']=AID
-            response['Content']=Content
-            response['Title']=Title
             return JsonResponse(response)
 
 def sendMyModel(request):
     response = {}
+    response['Status'] = False
     if request.method == "POST":
-        UID = request.POST.get('UID')
-        AID = request.POST.get('AID')
-        TID = request.POST.get('TID')
-        Content = request.POST.get('Content')
-        Title = request.POST.get('Title')
+        data = json.loads(request.body,strict=False)
+        UID = data.get('UID', None)
+        AID = data.get('AID', None)
+        TID = data.get('TID', None)
+        Content = data.get('Content', None)
+        Title = data.get('Title', None)
+        Tags = data.get('Tags', None)
         if UID and AID and Content and Title:
             AID = int(AID)
             UID = int(UID)
@@ -427,28 +437,26 @@ def sendMyModel(request):
                     if TID:
                         document.Team_id = int(TID)
                     document.save()
+                    for tag in Tags:
+                        Tag.objects.create(name=tag['name'], type=tag['type'], document=document)
                     response['AID']=document.pk
                 except Exception as e:
-                    #print(e)
                     response['error'] = "UID wrong"
-                    response['Status'] = False
                     return JsonResponse(response)
             else:
                 response['error']="AID!=-1"
                 return JsonResponse(request)
             response['Status'] = True
-            return JsonResponse(response)
         else:
-            response['Status'] = False
             response['error'] = "lost data"
-            response['UID'] = UID
-            response['AID'] = AID
-            response['Content'] = Content
-            response['Title'] = Title
-            return JsonResponse(response)
+        return JsonResponse(response)
 
 def getArticle(request):
     response={}
+    response['Status'] = False
+    response['Content'] = ""
+    response['Title'] = ""
+    response['Tags'] = []
     if request.method=="POST":
         AID = request.POST.get('AID')
         UID = request.POST.get('UID')
@@ -459,24 +467,31 @@ def getArticle(request):
                 document = Document.objects.get(pk=AID)
                 if document.recycle:
                     response['error'] = "you can't open a document which in recycle bin"
-                    response['Status'] = False
-                    response['Content'] = ""
-                    response['Title'] = ""
                     return JsonResponse(response)
-                try:
-                    dtb = Document_through_BrowseUser.objects.get(Document=document,User_id=UID)
-                    dtb.Browse_time = datetime.datetime.now()
-                    dtb.save()
-                except Exception as e:
-                    #print(e)
-                    response['warning']="last browse didn't record,but this time is done."
-                    dtb = Document_through_BrowseUser()
-                    dtb.Document=document
-                    dtb.User_id=UID
-                    dtb.save()
+                if document.model:
+                    pass
+                else:
+                    try:
+                        dtb = Document_through_BrowseUser.objects.get(Document=document,User_id=UID)
+                        dtb.Browse_time = datetime.datetime.now()
+                        dtb.save()
+                    except Exception as e:
+                        response['warning']="last browse didn't record,but this time is done."
+                        dtb = Document_through_BrowseUser()
+                        dtb.Document=document
+                        dtb.User_id=UID
+                        dtb.save()
+                    document.browse_num += 1
+                    document.save()
                 response['Status'] = True
                 response['Content'] = document.content
                 response['Title'] = document.title
+                tags = Tag.objects.filter(document=document)
+                for tag in tags:
+                    t={}
+                    t['name']=tag.name
+                    t['type']=tag.type
+                    response['Tags'].append(t)
                 return JsonResponse(response)
             except Exception as e:
                 response["error"]="AID wrong"
@@ -513,20 +528,26 @@ def someInfo(request):
                         response['myTeam'].append(t)
                     except Exception as e:
                         response['error']="team database wrong"
-                        #print(e)
-
 
             documents1_B = Document_through_BrowseUser.objects.filter(User_id=UID,Browse_time__gte=(datetime.datetime.now() - datetime.timedelta(3)))
             if documents1_B:
                 for documents1 in documents1_B:
                     try:
                         d = {}
-                        document = Document.objects.get(pk=documents1.Document_id,recycle=False)
+                        document = Document.objects.get(pk=documents1.Document_id,recycle=False,model=False)
                         try:
                             dtc = Document_through_CollectUser.objects.get(Document=document,User_id=UID)
                             d['isCollect'] = True
                         except Exception as e:
                             d['isCollect'] = False
+                        d['Tags']=[]
+                        tags = Tag.objects.filter(document=document)
+                        for tag in tags:
+                            t = {}
+                            t['name'] = tag.name
+                            t['type'] = tag.type
+                            d['Tags'].append(t)
+
                         user = User.objects.get(pk=document.User_id)
                         d['lastEditDate']=document.last_time
                         d['documentName']=document.title
@@ -539,8 +560,7 @@ def someInfo(request):
                             d['TID']=""
                         response['Documents1'].append(d)
                     except Exception as e:
-                        response['error']="document database wrong"
-                        #print(e)
+                        pass
 
             documents2 = Document_through_EditUser.objects.filter(User_id=UID,Edit_time__gte=(datetime.datetime.now() - datetime.timedelta(3)))
             if documents2:
@@ -553,6 +573,13 @@ def someInfo(request):
                             d['isCollect'] = True
                         except Exception as e:
                             d['isCollect'] = False
+                        d['Tags'] = []
+                        tags = Tag.objects.filter(document=document)
+                        for tag in tags:
+                            t = {}
+                            t['name'] = tag.name
+                            t['type'] = tag.type
+                            d['Tags'].append(t)
                         user = User.objects.get(pk=dt.User_id)
                         d['lastEditDate'] = dt.last_time
                         d['documentName'] = dt.title
@@ -565,8 +592,7 @@ def someInfo(request):
                             d['TID']=""
                         response['Documents2'].append(d)
                     except Exception as e:
-                        response['error'] = "document database wrong"
-                        #print(e)
+                        pass
 
             documents3 = Document_through_CollectUser.objects.filter(User_id=UID)
             if documents3:
@@ -574,6 +600,13 @@ def someInfo(request):
                     try:
                         d={}
                         dt = Document.objects.get(pk=document.Document_id,recycle=False)
+                        d['Tags'] = []
+                        tags = Tag.objects.filter(document=document)
+                        for tag in tags:
+                            t = {}
+                            t['name'] = tag.name
+                            t['type'] = tag.type
+                            d['Tags'].append(t)
                         user = User.objects.get(pk=dt.User_id)
                         d['lastEditDate'] = dt.last_time
                         d['documentName'] = dt.title
@@ -586,8 +619,7 @@ def someInfo(request):
                             d['TID']=""
                         response['Documents3'].append(d)
                     except Exception as e:
-                        response['error']="document database wrong"
-                        #print(e)
+                        pass
 
             documents4 = Document.objects.filter(User_id=UID,model=True,recycle=False)
             if documents4:
@@ -596,6 +628,13 @@ def someInfo(request):
                         continue
                     else:
                         d={}
+                        d['Tags'] = []
+                        tags = Tag.objects.filter(document=document)
+                        for tag in tags:
+                            t = {}
+                            t['name'] = tag.name
+                            t['type'] = tag.type
+                            d['Tags'].append(t)
                         d['documentName']=document.title
                         d['UID']=document.User_id
                         d['MID']=document.pk
@@ -618,7 +657,7 @@ def teamList(request):
                     t={}
                     tm = Team.objects.get(pk=team.Team_id)
                     t['TID']=tm.pk
-                    t['TeamName']=tm.team_name
+                    t['teamName']=tm.team_name
                     response['teams'].append(t)
                 except Exception as e:
                     #print(e)
@@ -1030,6 +1069,9 @@ def DeleteComment(request):
             except Exception as e:
                 response['error']="this comment isn't exist"
                 return JsonResponse(response)
+            document = comment.Document
+            document.comment_num-=1
+            document.save()
             comment.delete()
             response['feedback']=True
         else:
@@ -1054,6 +1096,8 @@ def NewComment(request):
             except Exception as e:
                 response['error']="this document isn't exist"
                 return JsonResponse(response)
+            document.comment_num+=1
+            document.save()
             comment = Comment()
             comment.Document=document
             comment.User=user
@@ -1093,6 +1137,8 @@ def ReplyComment(request):
             except Exception as e:
                 response['error']="this document isn't exist"
                 return JsonResponse(response)
+            document.comment_num+=1
+            document.save()
             rt = Comment()
             rt.content=replycomment['content']
             rt.User = user
@@ -1225,9 +1271,15 @@ def TeamInfo(request):
             except Exception as e:
                 response['error']="database_utt wrong"
                 return JsonResponse(response)
+
             documents1 = Document.objects.filter(Team_id=TID,model=False,recycle=False)
             for document1 in documents1:
                 dt={}
+                try:
+                    dtc = Document_through_CollectUser.objects.get(Document=document1,User_id=UID)
+                    dt['isCollect'] = True
+                except Exception as e:
+                    dt['isCollect'] = False
                 dt['lastEditDate']=document1.last_time
                 dt['documentName']=document1.title
                 dt['documentOwner']=document1.User.User_name
@@ -1235,6 +1287,7 @@ def TeamInfo(request):
                 dt['UID']=document1.User_id
                 dt['TID']=document1.Team_id
                 response['Documents1'].append(dt)
+
             documents4 = Document.objects.filter(Team_id=TID,model=True,recycle=False)
             for document4 in documents4:
                 dt={}
@@ -1324,14 +1377,20 @@ def authJudger(request):
                 response['error']="this document isn't exist"
                 return JsonResponse(response)
             if document.Team:
-                response['TeamOwn']=True
+                try:
+                    utt = User_through_Team.objects.get(User_id=UID,Team=document.Team)
+                    response['TeamOwn']=True
+                    response['Status']=True
+                    return JsonResponse(response)
+                except Exception as e:
+                    pass
+            if document.User==user:
+                response['PrivateOwn']=True
             else:
-                if document.User==user:
-                    response['PrivateOwn']=True
-                else:
-                    response['CanRead']=document.readable
-                    response['CanComment']=document.judgeable
-                    response['CanEdit']=document.editable
+                response['CanRead']=document.readable
+                response['CanComment']=document.judgeable
+                response['CanEdit']=document.editable
+            response['Status']=True
         else:
             response['error']="lost data"
         return JsonResponse(response)
@@ -1530,6 +1589,13 @@ def someInfo1(request):
                 else:
                     if document.model:
                         d = {}
+                        d['Tags'] = []
+                        tags = Tag.objects.filter(document=document)
+                        for tag in tags:
+                            t = {}
+                            t['name'] = tag.name
+                            t['type'] = tag.type
+                            d['Tags'].append(t)
                         d['documentName'] = document.title
                         d['UID'] = document.User_id
                         d['MID'] = document.pk
@@ -1541,6 +1607,13 @@ def someInfo1(request):
                             d['isCollect'] = True
                         except Exception as e:
                             d['isCollect'] = False
+                        d['Tags'] = []
+                        tags = Tag.objects.filter(document=document)
+                        for tag in tags:
+                            t = {}
+                            t['name'] = tag.name
+                            t['type'] = tag.type
+                            d['Tags'].append(t)
                         d['documentName'] = document.title
                         d['lastEditDate'] = document.last_time
                         d['AID'] = document.pk
@@ -1580,6 +1653,13 @@ def someInfo2(request):
                     continue
                 else:
                     d = {}
+                    d['Tags'] = []
+                    tags = Tag.objects.filter(document=document)
+                    for tag in tags:
+                        t = {}
+                        t['name'] = tag.name
+                        t['type'] = tag.type
+                        d['Tags'].append(t)
                     d['documentName'] = document.title
                     d['lastEditDate'] = document.last_time
                     d['AID'] = document.pk
@@ -1676,6 +1756,87 @@ def TeamInfo2(request):
         else:
             response['error'] = "lost data"
         return JsonResponse(response)
+
+def deleteMessage(request):
+    response={}
+    response['Status']=False
+    if request.method=="POST":
+        data = json.loads(request.body,strict=False)
+        UID = data.get('UID',None)
+        MID = data.get('MID',None)
+        if UID and MID:
+            try:
+                UID = int(UID)
+            except Exception as e:
+                response['error']="UID isn't a number"
+                return JsonResponse(response)
+            try:
+                user = User.objects.get(pk=UID)
+            except Exception as e:
+                response['error']="this user isn't exist"
+                return JsonResponse(response)
+            for mid in MID:
+                try:
+                    message = Message.objects.get(accept_User_id=UID,pk=mid)
+                except Exception as e:
+                    response['error']="this message isn't exist or it's not belong this user"
+                    return JsonResponse(response)
+                message.delete()
+            response['Status']=True
+        else:
+            response['error']="lost data"
+        return JsonResponse(response)
+
+def AIDgetTID(request):
+    response={}
+    response['feedback']=False
+    response['TID']=""
+    if request.method=="POST":
+        AID = request.POST.get('AID')
+        if AID :
+            try:
+                AID = int(AID)
+            except Exception as e:
+                response['error']="AID isn't a number"
+                return JsonResponse(response)
+            try:
+                document = Document.objects.get(pk=AID)
+            except Exception as e:
+                response['error']="this document isn't exist"
+                return JsonResponse(response)
+            response['TID']=document.Team_id
+            response['feedback']=True
+        else:
+            response['error']="lost data"
+        return JsonResponse(response)
+
+def getcheckNum(request):
+    response={}
+    response['checknum']=0
+    response['editnum']=0
+    response['commentnum']=0
+    response['feedback']=False
+    if request.method=="POST":
+        AID = request.POST.get('AID')
+        if AID:
+            try:
+                AID = int(AID)
+            except Exception as e:
+                response['error']="AID isn't a number"
+                return JsonResponse(response)
+            try:
+                document = Document.objects.get(pk=AID)
+            except Exception as e:
+                response['error']="this document isn't exist"
+                return JsonResponse(response)
+            response['checknum']=document.browse_num
+            response['editnum']=document.edit_num
+            response['commentnum']=document.comment_num
+            response['feedback']=True
+        else:
+            response['error']="lost data"
+        return JsonResponse(response)
+
 
 
 

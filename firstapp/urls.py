@@ -53,5 +53,8 @@ urlpatterns = [
     path('someInfo2/', views.someInfo2, name='someInfo2'),
     path('changeTeamDescription/', views.changeTeamDescription, name='changeTeamDescription'),
     path('TeamInfo2/', views.TeamInfo2, name='TeamInfo2'),
+    path('deleteMessage/', views.deleteMessage, name='deleteMessage'),
+    path('AIDgetTID/', views.AIDgetTID, name='AIDgetTID'),
+    path('getcheckNum/', views.getcheckNum, name='getcheckNum'),
 
 ]
