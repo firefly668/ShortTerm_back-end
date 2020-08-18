@@ -40,6 +40,9 @@ class Document(models.Model):
     content = models.TextField(verbose_name="文档内容")
     title = models.CharField(max_length=32,verbose_name="文档标题")
 
+    #置顶评论
+    topcomment = models.IntegerField(default=-1)
+
     #浏览量 编辑量 评论量
     browse_num = models.IntegerField(default=0)
     edit_num = models.IntegerField(default=0)
@@ -59,11 +62,10 @@ class Document(models.Model):
 
     #团队权限
     Rnum = models.IntegerField(default=1)
-    Enum = models.IntegerField(default=3)
-    Cnum = models.IntegerField(default=2)
-    Dnum = models.IntegerField(default=4)
+    Enum = models.IntegerField(default=1)
+    Cnum = models.IntegerField(default=1)
+    Dnum = models.IntegerField(default=1)
 
-    file = models.ForeignKey('File', on_delete=models.CASCADE, verbose_name="所属文件夹", default=None,null=True)
     EditUsers = models.ManyToManyField('User',through='Document_through_EditUser',related_name="EditUsers",verbose_name="修改用户记录")
     BrowseUsers = models.ManyToManyField('User',through='Document_through_BrowseUser',related_name="BrowseUsers",verbose_name="浏览用户记录")
     CollectUsers = models.ManyToManyField('User',through='Document_through_CollectUser',related_name="CollectUsers",verbose_name="收藏用户列表")
@@ -74,16 +76,9 @@ class Tag(models.Model):
     name = models.CharField(max_length=64,verbose_name="标签名")
     type = models.CharField(max_length=64,verbose_name="标签种类")
 
+    Team = models.ForeignKey("Team",on_delete=models.CASCADE,verbose_name="",default=None,null=True)
+    User = models.ForeignKey("User",on_delete=models.CASCADE,verbose_name="",default=None)
     document = models.ForeignKey("Document",on_delete=models.CASCADE,verbose_name="所属文档",default=None,null=True)
-
-class File(models.Model):
-    File_name = models.CharField(max_length=32,verbose_name="文件夹名字",default=None)
-    create_time = models.DateTimeField(auto_now_add=True, verbose_name="创建时间")
-    last_time = models.DateTimeField(auto_now=True, verbose_name="最后一次修改时间")
-
-    EditUsers = models.ManyToManyField('User', through='File_through_EditUser',related_name="File_EditUsers")
-    User = models.ForeignKey('User', on_delete=models.CASCADE, verbose_name="创建者",related_name="create_user" ,default=None, blank=False)
-    Team = models.ForeignKey('Team', on_delete=models.CASCADE, verbose_name="团队", default=None)
 
 class Comment(models.Model):
     content = models.CharField(max_length=256,verbose_name="评价内容",default=None)
@@ -108,12 +103,6 @@ class Document_through_EditUser(models.Model):
     Document = models.ForeignKey('Document', on_delete=models.CASCADE, verbose_name="被修改文档", default=None, blank=False)
     User = models.ForeignKey('User',on_delete=models.CASCADE,verbose_name="修改者",default=None,blank=False)
     Edit_time = models.DateTimeField(auto_now=True, verbose_name="修改时间")
-
-class File_through_EditUser(models.Model):
-    File = models.ForeignKey('File', on_delete=models.CASCADE, verbose_name="被修改文件夹", default=None,blank=False)
-    User = models.ForeignKey('User', on_delete=models.CASCADE, verbose_name="修改者", default=None, blank=False)
-    Edit_time = models.DateTimeField(auto_now_add=True, verbose_name="修改时间")
-
 
 class Document_through_BrowseUser(models.Model):
     Document = models.ForeignKey('Document', on_delete=models.CASCADE, verbose_name="被浏览文档", default=None, blank=False)

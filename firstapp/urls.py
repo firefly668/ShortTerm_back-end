@@ -56,5 +56,10 @@ urlpatterns = [
     path('deleteMessage/', views.deleteMessage, name='deleteMessage'),
     path('AIDgetTID/', views.AIDgetTID, name='AIDgetTID'),
     path('getcheckNum/', views.getcheckNum, name='getcheckNum'),
+    path('privateUpload/', views.privateUpload, name='privateUpload'),
+    path('teamUpload/', views.teamUpload, name='teamUpload'),
+    path('getTags/', views.getTags, name='getTags'),
+    path('gototop/', views.gototop, name='gototop'),
+    path('downloadFile/', views.downloadFile, name='downloadFile'),
 
 ]
