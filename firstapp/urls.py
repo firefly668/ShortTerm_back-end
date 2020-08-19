@@ -61,5 +61,8 @@ urlpatterns = [
     path('getTags/', views.getTags, name='getTags'),
     path('gototop/', views.gototop, name='gototop'),
     path('downloadFile/', views.downloadFile, name='downloadFile'),
+    path('AIDtoUID/', views.AIDtoUID, name='AIDtoUID'),
+    path('AIDgetMD5/', views.AIDgetMD5, name='AIDgetMD5'),
+    path('isShared/', views.isShared, name='isShared'),
 
 ]

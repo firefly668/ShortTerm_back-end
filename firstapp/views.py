@@ -22,6 +22,7 @@ import json
 import simplejson
 import random
 import datetime
+import hashlib
 
 # Create your views here.
 def checkUsername(request):
@@ -367,19 +368,25 @@ def sendMyArticle(request):
                     document.title = Title
                     document.content = Content
                     document.User = User.objects.get(pk=UID)
-                    if TID:
-                        document.Team_id = int(TID)
                     document.save()
-                    Tag.objects.filter(document=document).delete()
-                    for tag in Tags:
-                        Tag.objects.create(name=tag['name'],type=tag['type'],document=document,User_id=UID)
+                    Tag.objects.filter(document_id=document.pk).delete()
+                    if TID:
+                        for tag in Tags:
+                            Tag.objects.create(name=tag['name'], type=tag['type'], document_id=document.pk, User_id=UID,Team_id=TID)
+                        document.Team_id = int(TID)
+                    else:
+                        for tag in Tags:
+                            Tag.objects.create(name=tag['name'],type=tag['type'],document_id=document.pk,User_id=UID)
                     response['AID']=document.pk
+                    MD5 = hashlib.md5(str(random.randint(10000, 99999)).encode("utf8")).hexdigest()
                     Document_through_EditUser.objects.create(Document=document, User_id=UID)
                     Document_through_BrowseUser.objects.create(Document=document,User_id=UID)
                     document.browse_num+=1
                     document.edit_num+=1
+                    document.MD5=MD5
                     document.save()
                 except Exception as e:
+                    response['error']=str(e)
                     return JsonResponse(response)
             else:
                 try:
@@ -387,28 +394,34 @@ def sendMyArticle(request):
                 except Exception as e:
                     response['error'] = "AID wrong"
                     return JsonResponse(response)
-                lastbrowse_time = Document_through_BrowseUser.objects.get(User_id=UID,Document=document).Browse_time
-                if lastbrowse_time>document.last_time:
+                #一致性：最后浏览时间大于最后编辑时间
+                lastbrowse_time = Document_through_BrowseUser.objects.get(User_id=UID,Document_id=document.pk).Browse_time
+                strb = lastbrowse_time.strftime("%Y-%m-%d %H:%M:%S")
+                stre = document.last_time.strftime("%Y-%m-%d %H:%M:%S")
+                '''if lastbrowse_time<document.last_time:
                     response['error']="someone is editing this document"
+                    return JsonResponse(response)'''
+                if strb<stre:
+                    response['error']="该文档已被别人修改，请重新打开"
                     return JsonResponse(response)
                 document.title = Title
                 document.content = Content
-                Tag.objects.filter(document=document).delete()
+                Tag.objects.filter(document_id=document.pk).delete()
                 if TID:
                     for tag in Tags:
-                        Tag.objects.create(name=tag['name'], type=tag['type'], document=document, User_id=UID,Team_id=TID)
+                        Tag.objects.create(name=tag['name'], type=tag['type'], document_id=AID, User_id=UID,Team_id=TID)
                     document.Team_id = int(TID)
                 else:
                     for tag in Tags:
-                        Tag.objects.create(name=tag['name'], type=tag['type'], document=document, User_id=UID)
+                        Tag.objects.create(name=tag['name'], type=tag['type'], document_id=document.pk, User_id=UID)
                 document.edit_num+=1
                 document.save()
                 try:
-                    dte = Document_through_EditUser.objects.get(Document=document,User_id=UID)
+                    dte = Document_through_EditUser.objects.get(Document_id=document.pk,User_id=UID)
                     dte.Edit_time = datetime.datetime.now()
                     dte.save()
                 except Exception as e:
-                    Document_through_EditUser.objects.create(Document=document, User_id=UID)
+                    Document_through_EditUser.objects.create(Document_id=document.pk, User_id=UID)
                     response['warning']="last edition didn't record,but this time is done."
             response['Status'] = True
         else:
@@ -438,6 +451,8 @@ def sendMyModel(request):
                     document.User = User.objects.get(pk=UID)
                     if TID:
                         document.Team_id = int(TID)
+                    MD5 = hashlib.md5(str(random.randint(10000, 99999)).encode("utf8")).hexdigest()
+                    document.MD5=MD5
                     document.save()
                     '''for tag in Tags:
                         Tag.objects.create(name=tag['name'], type=tag['type'], document=document,User_id=UID)
@@ -463,8 +478,12 @@ def getArticle(request):
         AID = request.POST.get('AID')
         UID = request.POST.get('UID')
         if AID and UID:
-            AID = int(AID)
-            UID = int(UID)
+            try:
+                AID = int(AID)
+                UID = int(UID)
+            except Exception as e:
+                response['error']="AID or UID isn't a number"
+                return JsonResponse(response)
             try:
                 document = Document.objects.get(pk=AID)
                 if document.recycle:
@@ -494,13 +513,12 @@ def getArticle(request):
                 response['Status'] = True
                 response['Content'] = document.content
                 response['Title'] = document.title
-                return JsonResponse(response)
             except Exception as e:
                 response["error"]="AID wrong"
                 return JsonResponse(response)
         else:
             response['error'] = "lost data"
-            return JsonResponse(response)
+        return JsonResponse(response)
 
 def someInfo(request):
     response={}
@@ -1888,7 +1906,13 @@ def privateUpload(request):
         content = ""
         for line in file.chunks():
             content+=str(line,'utf8')
-        Document.objects.create(title=file.name,content=content,User=user)
+        MD5 = hashlib.md5(str(random.randint(10000,99999)).encode("utf8")).hexdigest()
+        document = Document.objects.create(title=file.name,content=content,User_id=UID,MD5=MD5)
+        Document_through_BrowseUser.objects.create(Document_id=document.pk,User_id=UID)
+        Document_through_EditUser.objects.create(Document_id=document.pk,User_id=UID)
+        document.browse_num+=1
+        document.edit_num+=1
+        document.save()
         response['Status']=True
         return JsonResponse(response)
 
@@ -1918,7 +1942,13 @@ def teamUpload(request):
         content = ""
         for line in file.chunks():
             content += str(line,'utf8')
-        Document.objects.create(title=file.name, content=content, User=user,Team=team)
+        MD5 = hashlib.md5(str(random.randint(10000,99999)).encode("utf8")).hexdigest()
+        document = Document.objects.create(title=file.name, content=content, User_id=UID,Team_id=TID,MD5=MD5)
+        Document_through_BrowseUser.objects.create(Document_id=document.pk, User_id=UID)
+        Document_through_EditUser.objects.create(Document_id=document.pk, User_id=UID)
+        document.browse_num += 1
+        document.edit_num += 1
+        document.save()
         response['Status'] = True
         return JsonResponse(response)
 
@@ -1941,12 +1971,21 @@ def getTags(request):
                 except Exception as e:
                     response['error'] = "this user isn't exist"
                     return JsonResponse(response)
-                tags = Tag.objects.filter(User=user,Team=None)
+                tags = Tag.objects.filter(User_id=UID,Team_id=None)
+                distinct_name = []
+                distinct_type = []
                 for tag in tags:
+                    if tag.name in distinct_name:
+                        continue
+                    if tag.type in distinct_type:
+                        continue
                     t={}
                     t['name']=tag.name
                     t['type']=tag.type
+                    distinct_name.append(tag.name)
+                    distinct_type.append(tag.type)
                     response['tags'].append(t)
+                response['mode']="User"
                 response['Status']=True
             else:
                 response['error']="lost data"
@@ -1963,12 +2002,21 @@ def getTags(request):
                 except Exception as e:
                     response['error'] = "this user isn't exist"
                     return JsonResponse(response)
-                tags = Tag.objects.filter(Team=team)
+                tags = Tag.objects.filter(Team_id=TID)
+                distinct_name = []
+                distinct_type = []
                 for tag in tags:
+                    if tag.name in distinct_name:
+                        continue
+                    if tag.type in distinct_type:
+                        continue
                     t = {}
                     t['name'] = tag.name
                     t['type'] = tag.type
+                    distinct_name.append(tag.name)
+                    distinct_type.append(tag.type)
                     response['tags'].append(t)
+                response['mode']="team"
                 response['Status']=True
             else:
                 response['error']="lost data"
@@ -2044,7 +2092,7 @@ def downloadFile(request):
                     response['error'] = "this team isn't exist"
                     return JsonResponse(response)
                 try:
-                    level = User_through_Team.objects.get(User=user,Team=team)
+                    level = User_through_Team.objects.get(User_id=UID,Team_id=TID).level
                 except Exception as e:
                     response['error']="this user don't belong this team"
                     return JsonResponse(response)
@@ -2067,6 +2115,96 @@ def downloadFile(request):
                     response['status']=True
                 else:
                     response['error']="share low level"
+        else:
+            response['error']="lost data"
+        return JsonResponse(response)
+
+def AIDtoUID(request):
+    response={}
+    response['UID']=-1
+    response['md5']=""
+    if request.method=="POST":
+        AID = request.POST.get('AID')
+        if AID:
+            try:
+                AID = int(AID)
+            except Exception as e:
+                response['error']="AID isn't a number"
+                return JsonResponse(response)
+            try:
+                document = Document.objects.get(pk=AID)
+            except Exception as e:
+                response['error']="this document isn't exist"
+                return JsonResponse(response)
+            response['UID']=document.User_id
+            response['md5']=document.MD5
+        else:
+            response['error']="lost data"
+        return JsonResponse(response)
+
+def AIDgetMD5(request):
+    response={}
+    response['AID']=-1
+    response['feedback']=False
+    if request.method=="POST":
+        md5 = request.POST.get('md5')
+        if md5:
+            try:
+                document = Document.objects.get(MD5=md5)
+            except Exception as e:
+                response['error']="this document isn't exist"
+                return JsonResponse(response)
+            response['AID']=document.pk
+            response['feedback']=True
+        else:
+            response['error']="lost data"
+        return JsonResponse(response)
+
+def isShared(request):
+    response={}
+    if request.method=="POST":
+        UID = request.POST.get('UID')
+        AID = request.POST.get('AID')
+        TID = request.POST.get('TID')
+        if UID and AID:
+            try:
+                UID = int(UID)
+                AID = int(AID)
+            except Exception as e:
+                response['error']="UID or AID isn't a number"
+                return JsonResponse(response)
+            try:
+                user = User.objects.get(pk=UID)
+            except Exception as e:
+                response['error']="this user isn't exist"
+                return JsonResponse(response)
+            try:
+                document = Document.objects.get(pk=AID)
+            except Exception as e:
+                response['error']="this document isn't exist"
+                return JsonResponse(response)
+            if TID:
+                try:
+                    TID = int(TID)
+                except Exception as e:
+                    response['error'] = "TID isn't a number"
+                    return JsonResponse(response)
+                try:
+                    team = Team.objects.get(pk=TID)
+                except Exception as e:
+                    response['error']="this team isn't exist"
+                    return JsonResponse(response)
+                try:
+                    utt = User_through_Team.objects.get(User_id=UID,Team_id=TID)
+                    response['status']=False
+                except Exception as e:
+                    response['status']=True
+            else:
+                if document.User_id==UID:
+                    response['status']=False
+                else:
+                    response['status']=True
+            response['md5']=document.MD5
         else:
             response['error']="lost data"
         return JsonResponse(response)

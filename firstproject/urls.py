@@ -14,7 +14,7 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import include, re_path
+from django.urls import include, re_path,path
 from firstapp import views
 from firstapp import urls
 from django.views.generic import TemplateView
@@ -23,4 +23,21 @@ urlpatterns = [
     re_path('admin/', admin.site.urls),
     re_path('api/', include(urls)),  # vue前端获取数据的url
     re_path('^$', TemplateView.as_view(template_name="index.html")),
+    path('PersonIndex/',TemplateView.as_view(template_name="index.html")),
+    path('WorkRight/',TemplateView.as_view(template_name="index.html")),
+    path('Test1/', TemplateView.as_view(template_name="index.html")),
+    path('craftTable/<int:UID>/', TemplateView.as_view(template_name="index.html")),
+    path('myDocs/<int:UID>/', TemplateView.as_view(template_name="index.html")),
+    path('Edit/<int:UID>/<int:AID>/<int:MID>/', TemplateView.as_view(template_name="index.html")),
+    path('Comment/', TemplateView.as_view(template_name="index.html")),
+    path('Edit/<int:UID>/<int:AID>/<int:MID>/<int:TID>/', TemplateView.as_view(template_name="index.html")),
+    path('myTeam/<int:UID>/<int:TID>/', TemplateView.as_view(template_name="index.html")),
+    path('personalRecycleBin/<int:UID>/', TemplateView.as_view(template_name="index.html")),
+    path('teamRecycleBin/<int:TID>/', TemplateView.as_view(template_name="index.html")),
+    path('Test/', TemplateView.as_view(template_name="index.html")),
+    path('OtherIndex/<int:UID>/', TemplateView.as_view(template_name="index.html")),
+    path('sharepage/<int:UID>/<int:AID>/', TemplateView.as_view(template_name="index.html")),
+    path('sharepage/<int:AID>/', TemplateView.as_view(template_name="index.html")),
+    path('viewNumSider/', TemplateView.as_view(template_name="index.html")),
+
 ]

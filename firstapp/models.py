@@ -40,6 +40,8 @@ class Document(models.Model):
     content = models.TextField(verbose_name="文档内容")
     title = models.CharField(max_length=32,verbose_name="文档标题")
 
+    MD5 = models.CharField(max_length=64,default="",verbose_name="加密信息")
+
     #置顶评论
     topcomment = models.IntegerField(default=-1)
 
